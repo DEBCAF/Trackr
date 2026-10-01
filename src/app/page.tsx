@@ -17,6 +17,7 @@ export default function BudgetDashboard() {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('Food')
   const [transType, setTransType] = useState<'expense' | 'manual'>('expense')
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     fetchTransactions()
@@ -34,25 +35,33 @@ export default function BudgetDashboard() {
 
   async function handleAddTransaction(e: React.FormEvent) {
     e.preventDefault()
+    setSaveError('')
     const numericAmount = parseFloat(amount)
     if (isNaN(numericAmount)) return
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    // Expenses are stored as negative numbers; manual top-ups/income as positive
-    const finalAmount = transType === 'expense' ? -Math.abs(numericAmount) : Math.abs(numericAmount)
+      // Expenses are stored as negative numbers; manual top-ups/income as positive
+      const finalAmount = transType === 'expense' ? -Math.abs(numericAmount) : Math.abs(numericAmount)
 
-    const { error } = await supabase.from('transactions').insert({
-      title,
-      amount: finalAmount,
-      category,
-      type: transType,
-    })
+      const { error } = await supabase.from('transactions').insert({
+        title,
+        amount: finalAmount,
+        category,
+        type: transType,
+      })
 
-    if (!error) {
+      if (error) {
+        setSaveError(error.message)
+        return
+      }
+
       setTitle('')
       setAmount('')
       fetchTransactions()
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save transaction.')
     }
   }
 
@@ -169,6 +178,7 @@ export default function BudgetDashboard() {
             <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700">
               Save Transaction
             </button>
+            {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
           </form>
 
           {/* Transaction History List */}
