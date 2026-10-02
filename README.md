@@ -34,3 +34,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Supabase account setup
+
+1. Create your account in Supabase Authentication with email and password.
+2. Run `supabase/transactions_rls.sql` in the Supabase SQL Editor.
+3. Backfill existing transactions by replacing the email in the commented query in that SQL file with your account email, then run the query.
+4. Set `TRACKR_OWNER_ID` to your Auth user UUID in `.env.local` and in Vercel. Find the UUID in Supabase Authentication under Users.
+
+The dashboard and transaction API require a signed-in account. Row-level security limits transaction access to that account. The allowance cron uses `TRACKR_OWNER_ID` to assign scheduled entries to the same account.

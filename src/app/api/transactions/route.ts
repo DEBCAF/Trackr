@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase_admin'
+import { createServerSupabaseClient } from '@/lib/supabase_server'
 
 export async function GET() {
-  const supabase = getSupabaseAdmin()
+  const supabase = await createServerSupabaseClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
@@ -16,6 +21,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const body = await request.json()
   const title = typeof body.title === 'string' ? body.title.trim() : ''
   const amount = Number(body.amount)
@@ -30,10 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid transaction type' }, { status: 400 })
   }
 
-  const supabase = getSupabaseAdmin()
   const { data, error } = await supabase
     .from('transactions')
-    .insert({ title, amount, category, type })
+    .insert({ title, amount, category, type, user_id: user.id })
     .select()
     .single()
 

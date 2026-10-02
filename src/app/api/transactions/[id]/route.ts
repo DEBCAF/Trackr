@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase_admin'
+import { createServerSupabaseClient } from '@/lib/supabase_server'
 
 export async function DELETE(
   _request: Request,
@@ -10,7 +10,12 @@ export async function DELETE(
     return NextResponse.json({ error: 'Missing id' }, { status: 400 })
   }
 
-  const supabase = getSupabaseAdmin()
+  const supabase = await createServerSupabaseClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { error } = await supabase.from('transactions').delete().eq('id', id)
 
   if (error) {

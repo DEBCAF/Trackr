@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase_client'
 
 interface Transaction {
@@ -12,7 +13,13 @@ interface Transaction {
 }
 
 export default function BudgetDashboard() {
+  const [user, setUser] = useState<User | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loadError, setLoadError] = useState('')
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('Food')
@@ -20,8 +27,33 @@ export default function BudgetDashboard() {
   const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
-    fetchTransactions()
+    const supabase = createClient()
+    let mounted = true
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return
+      if (error) setAuthError(error.message)
+      setUser(data.session?.user ?? null)
+      setAuthReady(true)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (!session?.user) setTransactions([])
+      setAuthReady(true)
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
+
+  useEffect(() => {
+    if (user) {
+      fetchTransactions()
+    }
+  }, [user])
 
   async function fetchTransactions() {
     const supabase = createClient()
@@ -30,12 +62,32 @@ export default function BudgetDashboard() {
       .select('*')
       .order('created_at', { ascending: false })
 
+    if (error) {
+      setLoadError(error.message)
+      return
+    }
+
+    setLoadError('')
     if (data) setTransactions(data)
+  }
+
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault()
+    setAuthError('')
+
+    const { error } = await createClient().auth.signInWithPassword({ email, password })
+    if (error) setAuthError(error.message)
+  }
+
+  async function handleSignOut() {
+    const { error } = await createClient().auth.signOut()
+    if (error) setAuthError(error.message)
   }
 
   async function handleAddTransaction(e: React.FormEvent) {
     e.preventDefault()
     setSaveError('')
+    if (!user) return
     const numericAmount = parseFloat(amount)
     if (isNaN(numericAmount)) return
 
@@ -50,6 +102,7 @@ export default function BudgetDashboard() {
         amount: finalAmount,
         category,
         type: transType,
+        user_id: user.id,
       })
 
       if (error) {
@@ -59,7 +112,7 @@ export default function BudgetDashboard() {
 
       setTitle('')
       setAmount('')
-      fetchTransactions()
+      await fetchTransactions()
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Could not save transaction.')
     }
@@ -67,8 +120,54 @@ export default function BudgetDashboard() {
 
   async function handleDelete(id: string) {
     const supabase = createClient()
-    await supabase.from('transactions').delete().eq('id', id)
-    fetchTransactions()
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) {
+      setLoadError(error.message)
+      return
+    }
+    await fetchTransactions()
+  }
+
+  if (!authReady) {
+    return <main className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 text-gray-900 dark:text-gray-100">Loading...</main>
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6 flex items-center justify-center">
+        <form onSubmit={handleSignIn} className="w-full max-w-sm bg-white dark:bg-gray-800 p-6 rounded-xl border shadow-sm space-y-4">
+          <h1 className="text-xl font-bold">Sign in to Trackr</h1>
+          <div>
+            <label htmlFor="email" className="block text-sm mb-1">Email</label>
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              className="w-full border dark:border-gray-700 bg-transparent p-2 rounded"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm mb-1">Password</label>
+            <input
+              id="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              className="w-full border dark:border-gray-700 bg-transparent p-2 rounded"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700">
+            Sign in
+          </button>
+          {authError && <p role="alert" className="text-sm text-red-600">{authError}</p>}
+        </form>
+      </main>
+    )
   }
 
   // Calculate Central Balance
@@ -88,6 +187,14 @@ export default function BudgetDashboard() {
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Trackr</h1>
+          <button type="button" onClick={handleSignOut} className="text-sm underline">
+            Sign out
+          </button>
+        </div>
+
+        {loadError && <p role="alert" className="text-sm text-red-600">{loadError}</p>}
         
         {/* Central Balance Display */}
         <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl border shadow-sm text-center">
