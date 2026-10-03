@@ -42,4 +42,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 3. Backfill existing transactions by replacing the email in the commented query in that SQL file with your account email, then run the query.
 4. Set `TRACKR_OWNER_ID` to your Auth user UUID in `.env.local` and in Vercel. Find the UUID in Supabase Authentication under Users.
 
-The dashboard and transaction API require a signed-in account. Row-level security limits transaction access to that account. The allowance cron uses `TRACKR_OWNER_ID` to assign scheduled entries to the same account.
+The dashboard and transaction API require a signed-in account. Row-level security limits transaction access to that account. The allowance cron uses `TRACKR_OWNER_ID` to add a £40 morning allowance daily at 08:00 UTC. The dashboard's daily allowance metric shows £40 minus expenses recorded today.

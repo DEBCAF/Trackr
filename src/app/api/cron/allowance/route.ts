@@ -16,26 +16,14 @@ export async function GET(request: Request) {
 
   const supabaseAdmin = getSupabaseAdmin()
   const { searchParams } = new URL(request.url)
-  const slot = searchParams.get('slot') // 'morning', 'noon', or 'evening'
-
-  let amount = 0
-  let title = ''
-
-  if (slot === 'morning') {
-    amount = 10.00
-    title = 'Daily Allowance (Morning)'
-  } else if (slot === 'noon') {
-    amount = 15.00
-    title = 'Daily Allowance (Noon)'
-  } else if (slot === 'evening') {
-    amount = 15.00
-    title = 'Daily Allowance (Evening)'
-  } else {
+  const slot = searchParams.get('slot')
+  if (slot !== 'morning') {
     return NextResponse.json({ error: 'Invalid slot' }, { status: 400 })
   }
 
+  const amount = 40
   const { error } = await supabaseAdmin.from('transactions').insert({
-    title,
+    title: 'Daily Allowance (Morning)',
     amount,
     category: 'Allowance',
     type: 'allowance',

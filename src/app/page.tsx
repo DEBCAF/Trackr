@@ -18,11 +18,11 @@ export default function BudgetDashboard() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
+  const [isSigningIn, setIsSigningIn] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadError, setLoadError] = useState('')
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState('Food')
   const [transType, setTransType] = useState<'expense' | 'manual'>('expense')
   const [saveError, setSaveError] = useState('')
 
@@ -74,9 +74,22 @@ export default function BudgetDashboard() {
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
     setAuthError('')
+    setIsSigningIn(true)
 
-    const { error } = await createClient().auth.signInWithPassword({ email, password })
-    if (error) setAuthError(error.message)
+    try {
+      const { data, error } = await createClient().auth.signInWithPassword({ email, password })
+      if (error) {
+        setAuthError(error.message)
+        return
+      }
+
+      setUser(data.user)
+      setAuthReady(true)
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not sign in.')
+    } finally {
+      setIsSigningIn(false)
+    }
   }
 
   async function handleSignOut() {
@@ -100,7 +113,7 @@ export default function BudgetDashboard() {
       const { error } = await supabase.from('transactions').insert({
         title,
         amount: finalAmount,
-        category,
+        category: 'General',
         type: transType,
         user_id: user.id,
       })
@@ -161,8 +174,8 @@ export default function BudgetDashboard() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700">
-            Sign in
+          <button type="submit" disabled={isSigningIn} className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">
+            {isSigningIn ? 'Signing in...' : 'Sign in'}
           </button>
           {authError && <p role="alert" className="text-sm text-red-600">{authError}</p>}
         </form>
@@ -178,11 +191,7 @@ export default function BudgetDashboard() {
   const totalSpentToday = transactions
     .filter((t) => t.type === 'expense' && t.created_at.startsWith(todayStr))
     .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0)
-
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  const totalSpentThisWeek = transactions
-    .filter((t) => t.type === 'expense' && new Date(t.created_at) >= sevenDaysAgo)
-    .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0)
+  const dailyNet = 40 - totalSpentToday
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
@@ -207,14 +216,12 @@ export default function BudgetDashboard() {
         </div>
 
         {/* Summary Metric Cards */}
-        <div className="grid grid-cols-2 gap-4">
+        <div>
           <div className="bg-white dark:bg-gray-800 p-5 rounded-xl border shadow-sm">
-            <p className="text-sm text-gray-500">Spent Today</p>
-            <p className="text-2xl font-bold text-rose-500">£{totalSpentToday.toFixed(2)}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl border shadow-sm">
-            <p className="text-sm text-gray-500">Spent This Week</p>
-            <p className="text-2xl font-bold text-rose-500">£{totalSpentThisWeek.toFixed(2)}</p>
+            <p className="text-sm text-gray-500">Today&apos;s Allowance Remaining</p>
+            <p className={`text-2xl font-bold ${dailyNet >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+              £{dailyNet.toFixed(2)}
+            </p>
           </div>
         </div>
 
@@ -265,21 +272,6 @@ export default function BudgetDashboard() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
-            </div>
-
-            <div>
-              <label className="block text-sm mb-1">Category</label>
-              <select
-                className="w-full border dark:border-gray-700 bg-transparent p-2 rounded"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value="Food">Food</option>
-                <option value="Transport">Transport</option>
-                <option value="Entertainment">Entertainment</option>
-                <option value="Bills">Bills</option>
-                <option value="General">General</option>
-              </select>
             </div>
 
             <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700">
